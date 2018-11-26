@@ -1,0 +1,150 @@
+#include <asf.h>
+
+void Simple_Clock_Init(void);
+void configure_dac(void);
+void configure_dac_clock(void);
+void wait(int t);
+void one_k_sine(void);
+void Simple_Clk_Init(void);
+
+Dac * dac_pointer = DAC;
+
+int count;
+int n = 0;
+int change_n = 10;
+int direct = 0;
+
+uint16_t  wave[10] = { 
+
+}; // Digital signal I want to convert into analog
+
+
+int main(void)
+{
+	system_init();
+	configure_dac_clock();
+	configure_dac();
+	
+	//Port *ports = PORT_INSTS;
+	//PortGroup *porA = &(ports->Group[0]);	
+	
+	//porA->DIRSET.reg = PORT_PA07 | PORT_PA06 | PORT_PA05 | PORT_PA04;     
+ 	//porA->DIRCLR.reg = PORT_PA19 |PORT_PA18 |PORT_PA17 |PORT_PA16;
+	
+	//porA->OUTCLR.reg = PORT_PA19 |PORT_PA18 |PORT_PA17 |PORT_PA16;
+	//porA->OUTCLR.reg = PORT_PA07 | PORT_PA06 | PORT_PA05 | PORT_PA04;
+	
+	//porA->PINCFG[19].reg=PORT_PINCFG_INEN | PORT_PINCFG_PULLEN;
+	//porA->PINCFG[18].reg=PORT_PINCFG_INEN | PORT_PINCFG_PULLEN;
+	//porA->PINCFG[17].reg=PORT_PINCFG_INEN | PORT_PINCFG_PULLEN;
+	//porA->PINCFG[16].reg=PORT_PINCFG_INEN | PORT_PINCFG_PULLEN;
+
+	//porA->OUTCLR.reg = PORT_PA07;		
+	//porA->OUTSET.reg = PORT_PA06 | PORT_PA05 | PORT_PA04;	
+
+	while (1) {	
+		
+		while (dac_pointer->STATUS.reg & DAC_STATUS_SYNCBUSY) {};
+			one_k_sine();
+	}		
+}
+
+void configure_dac_clock(void)
+{
+	PM->APBCMASK.reg |= 0x4 << 16; 			// PM_APBCMASK_______ is in the ___ position, See Section 16.7
+	
+	uint32_t temp = 0x1A; 			// ID for ________ is__________ (see table 15-2)
+	temp |= 0<<8; 					// Selection Generic clock generator 0
+	GCLK->CLKCTRL.reg = temp; 			// Setup in the CLKCTRL register
+	GCLK->CLKCTRL.reg |= 0x1u << 14; 		// enable it.
+}
+
+void configure_dac(void)
+{
+	//set pin as output for the DAC
+	Port *ports = PORT_INSTS;
+	PortGroup *porA = &(ports->Group[0]);
+	
+	porA->PINCFG[2].bit.PMUXEN = 0x1;		// set to correct pin configuration, Section 22.7
+	porA->PMUX[1].bit.PMUXE = 0x1;			// set to correct peripheral, Section 22.7
+
+	porA->DIRSET.reg = PORT_PA02; //set output
+	
+	while (dac_pointer->STATUS.reg & DAC_STATUS_SYNCBUSY) {
+		/* Wait until the synchronization is complete */
+	}
+
+	/* Set reference voltage with CTRLB */
+	dac_pointer->CTRLB.reg |= 0x0 << 6;
+
+	while (dac_pointer->STATUS.reg & DAC_STATUS_SYNCBUSY) {
+		/* Wait until the synchronization is complete */
+	}
+
+	/* Enable the module with CTRLA, Section 31.7 */
+	dac_pointer->CTRLA.reg |= 0x2;
+	/* Enable selected output with CTRLB, Section 31.7 */
+	dac_pointer->CTRLB.reg |= 0x1;
+}
+
+//Simple Clock Initialization
+void Simple_Clk_Init(void)
+{
+	/* Various bits in the INTFLAG register can be set to one at startup.
+	   This will ensure that these bits are cleared */
+	
+	SYSCTRL->INTFLAG.reg = SYSCTRL_INTFLAG_BOD33RDY | SYSCTRL_INTFLAG_BOD33DET |
+			SYSCTRL_INTFLAG_DFLLRDY;
+			
+	system_flash_set_waitstates(0);  		//Clock_flash wait state = 0
+
+	SYSCTRL_OSC8M_Type temp = SYSCTRL->OSC8M;      	/* for OSC8M initialization  */
+
+	temp.bit.PRESC    = 0;    			// no divide, i.e., set clock=8Mhz  (see page 170)
+	temp.bit.ONDEMAND = 1;    			//  On-demand is true
+	temp.bit.RUNSTDBY = 0;    			//  Standby is false
+	
+	SYSCTRL->OSC8M = temp;
+
+	SYSCTRL->OSC8M.reg |= 0x1u << 1;  		// SYSCTRL_OSC8M_ENABLE bit = bit-1 (page 170)
+	
+	PM->CPUSEL.reg = (uint32_t)0;    		// CPU and BUS clocks Divide by 1  (see page 110)
+	PM->APBASEL.reg = (uint32_t)0;     		// APBA clock 0= Divide by 1  (see page 110)
+	PM->APBBSEL.reg = (uint32_t)0;     		// APBB clock 0= Divide by 1  (see page 110)
+	PM->APBCSEL.reg = (uint32_t)0;     		// APBB clock 0= Divide by 1  (see page 110)
+
+	PM->APBAMASK.reg |= 01u<<3;   			// Enable Generic clock controller clock (page 127)
+
+	/* Software reset Generic clock to ensure it is re-initialized correctly */
+
+	GCLK->CTRL.reg = 0x1u << 0;   			// Reset gen. clock (see page 94)
+	while (GCLK->CTRL.reg & 0x1u ) {  /* Wait for reset to complete */ }
+	
+	// Initialization and enable generic clock #0
+
+	*((uint8_t*)&GCLK->GENDIV.reg) = 0;  		// Select GCLK0 (page 104, Table 14-10)
+
+	GCLK->GENDIV.reg  = 0x0100;   		 	// Divide by 1 for GCLK #0 (page 104)
+
+	GCLK->GENCTRL.reg = 0x030600;  		 	// GCLK#0 enable, Source=6(OSC8M), IDC=1 (page 101)
+}
+
+void wait(int t)
+{
+	count = 0;
+    while (count < t*1000)
+	{
+		count++;
+	}
+}
+
+void one_k_sine(void){
+								
+	if(n == 10831){
+		//wait(400);
+		n = 0;
+	}
+	dac_pointer->DATA.reg = wave[n];
+	n++;
+	wait(0.1);
+}
