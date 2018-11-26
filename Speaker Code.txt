@@ -24,23 +24,6 @@ int main(void)
 	system_init();
 	configure_dac_clock();
 	configure_dac();
-	
-	//Port *ports = PORT_INSTS;
-	//PortGroup *porA = &(ports->Group[0]);	
-	
-	//porA->DIRSET.reg = PORT_PA07 | PORT_PA06 | PORT_PA05 | PORT_PA04;     
- 	//porA->DIRCLR.reg = PORT_PA19 |PORT_PA18 |PORT_PA17 |PORT_PA16;
-	
-	//porA->OUTCLR.reg = PORT_PA19 |PORT_PA18 |PORT_PA17 |PORT_PA16;
-	//porA->OUTCLR.reg = PORT_PA07 | PORT_PA06 | PORT_PA05 | PORT_PA04;
-	
-	//porA->PINCFG[19].reg=PORT_PINCFG_INEN | PORT_PINCFG_PULLEN;
-	//porA->PINCFG[18].reg=PORT_PINCFG_INEN | PORT_PINCFG_PULLEN;
-	//porA->PINCFG[17].reg=PORT_PINCFG_INEN | PORT_PINCFG_PULLEN;
-	//porA->PINCFG[16].reg=PORT_PINCFG_INEN | PORT_PINCFG_PULLEN;
-
-	//porA->OUTCLR.reg = PORT_PA07;		
-	//porA->OUTSET.reg = PORT_PA06 | PORT_PA05 | PORT_PA04;	
 
 	while (1) {	
 		
